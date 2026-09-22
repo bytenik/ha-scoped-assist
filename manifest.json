@@ -3,7 +3,8 @@
   "name": "Scoped Assist",
   "version": "0.1.0",
   "documentation": "https://github.com/bytenik/ha-scoped-assist",
-  "codeowners": [],
+  "issue_tracker": "https://github.com/bytenik/ha-scoped-assist/issues",
+  "codeowners": ["@bytenik"],
   "dependencies": ["conversation"],
-  "iot_class": "local_push"
+  "iot_class": "calculated"
 }
