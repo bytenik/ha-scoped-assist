@@ -71,6 +71,30 @@ _FILLER = frozenset(
 )
 
 
+def _squash(text: str) -> str:
+    """Letters and digits only, lowercased.
+
+    Speech-to-text is inconsistent about compounds: the same floodlight comes
+    back as "flood lights" one turn and "floodlights" the next, and an entity
+    registered either way should match both.
+    """
+    return "".join(c for c in text.casefold() if c.isalnum())
+
+
+def _variants(tokens: list[str]) -> list[str]:
+    """Each token, plus every run of adjacent tokens joined up.
+
+    Lets a single spoken word reach a name that spells it as several, and the
+    other way round, without giving short tokens a larger edit budget than
+    they have earned.
+    """
+    out = set(tokens)
+    for size in (2, 3):
+        for start in range(len(tokens) - size + 1):
+            out.add("".join(tokens[start : start + size]))
+    return sorted(out)
+
+
 def _tokens(text: str) -> list[str]:
     """Split a name into comparable lowercase word tokens."""
     cleaned = "".join(c if c.isalnum() or c.isspace() else " " for c in text)
@@ -116,12 +140,24 @@ def _budget(token: str) -> int:
 
 
 def _fuzzy_match(query_tokens: list[str], name_tokens: list[str]) -> bool:
-    """True if every query token is at or within its budget of a name token."""
+    """True if the query is within its edit budget of the name.
+
+    Satisfied either word by word, or by the whole query against a run of the
+    name's words: "foodlights" is a mishearing of a compound that the name
+    spells as two words, and neither comparison alone catches it.
+    """
     if not query_tokens:
         return False
-    return all(
-        any(_edit_distance(qt, nt, _budget(qt)) <= _budget(qt) for nt in name_tokens)
+    name_variants = _variants(name_tokens)
+    if all(
+        any(_edit_distance(qt, nv, _budget(qt)) <= _budget(qt) for nv in name_variants)
         for qt in query_tokens
+    ):
+        return True
+    whole = "".join(query_tokens)
+    return any(
+        _edit_distance(whole, nv, _budget(whole)) <= _budget(whole)
+        for nv in name_variants
     )
 
 
@@ -314,12 +350,21 @@ class FindEntitiesTool(llm.Tool):
         The exact matcher only accepts whole names and aliases, so a request for
         "the flood lights" finds nothing even when three entities are named
         "Front Flood Lights". Voice phrasing is rarely the registered name.
+
+        Compared both as written and with the spacing removed, because
+        speech-to-text splits compounds inconsistently and "front floodlights"
+        is otherwise not a substring of "Front Flood Lights".
         """
         needle = query.casefold().strip()
+        squashed = _squash(query)
         matches = [
             row
             for names, row in self._candidates(domains, area)
-            if any(needle in name.casefold() for name in names)
+            if any(
+                needle in name.casefold()
+                or (squashed and squashed in _squash(name))
+                for name in names
+            )
         ]
         return sorted(matches, key=lambda m: (m["area"], m["name"]))
 

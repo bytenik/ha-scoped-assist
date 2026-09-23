@@ -139,6 +139,13 @@ Every step exists because a real request failed without it.
 whole registered names and aliases. "The flood lights" matches nothing at all
 when the entities are named `Front Flood Lights`.
 
+**Spacing cannot be trusted** because speech-to-text splits compounds
+inconsistently: the same fitting arrives as "flood lights" on one turn and
+"floodlights" on the next, and an entity registered either way should match
+both. Names are compared with the spacing removed as well as as written, and
+the fuzzy pass builds each name's adjacent word-runs as candidates, so one
+spoken word can reach a name that spells it as several.
+
 **Substring matching is not enough** because speech-to-text is approximate, and
 the errors are usually a single phoneme. A request for the flood lights arrived
 as "food lights", found nothing, and was answered "those don't exist". Fuzzy
@@ -146,8 +153,10 @@ matching is per word rather than whole string, because the query is normally a
 fragment of a longer name. The edit budget scales with word length: none at
 three characters or fewer, where `fan`, `can` and `man` are all one edit apart
 and acting on the wrong device is worse than finding none; one up to six; two
-beyond. Fuzzy results are flagged as approximate, with instructions to name the
-device acted on so the user can correct it.
+beyond. The whole query is also compared against those word-runs, which is what
+catches a mishearing and a compound at once. Fuzzy results are flagged as
+approximate, with instructions to name the device acted on so the user can
+correct it.
 
 **The domain is a hint, not a filter.** The model infers a domain from the
 user's words, and the user's words describe the world, not how Home Assistant
