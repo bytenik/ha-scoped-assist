@@ -18,6 +18,11 @@ from .scope import async_entity_area_id
 
 _LOGGER = logging.getLogger(__name__)
 
+# Prefixed with the integration domain, matching homeassistant__GetLiveContext
+# and intent__HassTurnOn alongside it. Home Assistant reports unprefixed tool
+# names and breaks them in 2027.3.
+TOOL_NAME = "scoped_assist__FindEntities"
+
 DESCRIPTION = (
     "Find devices anywhere in the home by name. Returns every match with the "
     "area it is in. Read-only and cheap. Call it for one device at a time; "
@@ -164,7 +169,7 @@ def _fuzzy_match(query_tokens: list[str], name_tokens: list[str]) -> bool:
 class FindEntitiesTool(llm.Tool):
     """Locate exposed entities by name, anywhere in the home."""
 
-    name = "FindEntities"
+    name = TOOL_NAME
     description = DESCRIPTION
     parameters = vol.Schema(
         {

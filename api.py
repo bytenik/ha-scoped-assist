@@ -6,6 +6,13 @@ import json
 import logging
 from typing import Any, override
 
+from homeassistant.components.homeassistant.llm import (
+    DYNAMIC_CONTEXT_PROMPT,
+    async_get_exposed_entities,
+)
+from homeassistant.components.intent.llm import DEVICE_CONTROL_TOOL_USAGE_PROMPT
+from homeassistant.components.intent.timers import async_device_supports_timers
+from homeassistant.components.llm import async_get_tools
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import device_registry as dr
@@ -21,7 +28,7 @@ from .const import (
     DEFAULT_CONFIRM_OVER,
     DEFAULT_MAX_MATCHES,
 )
-from .finder import FindEntitiesTool
+from .finder import TOOL_NAME, FindEntitiesTool
 from .scope import Scope, async_entity_area_id, async_get_scope, async_is_ambient
 
 _LOGGER = logging.getLogger(__name__)
@@ -73,14 +80,14 @@ def _roomless_dynamic_context() -> str:
     and is left alone. The room-scoped prompt keeps the stock text verbatim,
     because that is the wording the 30/30 benchmark measured.
     """
-    stock = llm.DYNAMIC_CONTEXT_PROMPT
+    stock = DYNAMIC_CONTEXT_PROMPT
     old = (
         'If the user asks about device existence/type (e.g., "Do I have lights in '
         'the bedroom?"): Answer\nfrom the static context below.'
     )
     new = (
         'If the user asks about device existence/type (e.g., "Do I have lights in '
-        'the bedroom?"): call\n`FindEntities` to check. The list below is not an '
+        'the bedroom?"): call\n`' + TOOL_NAME + '` to check. The list below is not an '
         "inventory of the home."
     )
     if old not in stock:
@@ -91,7 +98,7 @@ def _roomless_dynamic_context() -> str:
     return stock.replace(old, new)
 
 
-class ScopedAssistAPI(llm.AssistAPI):
+class ScopedAssistAPI(llm.API):
     """Assist, with the entity list narrowed to the caller's neighbourhood.
 
     The stock API sends every exposed entity on every turn. Almost all of it is
@@ -117,9 +124,7 @@ class ScopedAssistAPI(llm.AssistAPI):
         confirm_over: int = DEFAULT_CONFIRM_OVER,
     ) -> None:
         """Init the class."""
-        super().__init__(hass)
-        self.id = API_ID
-        self.name = API_NAME
+        super().__init__(hass=hass, id=API_ID, name=API_NAME)
         self._earshot_prefix = earshot_prefix
         self._ambient_prefix = ambient_prefix
         self._actionable_only = actionable_only
@@ -131,25 +136,35 @@ class ScopedAssistAPI(llm.AssistAPI):
         self, llm_context: llm.LLMContext
     ) -> llm.APIInstance:
         """Return the instance of the API."""
-        exposed_entities: dict | None = None
+        # Every built-in LLM tools platform answers only for the built-in api
+        # id and returns nothing for any other, so ask under that id to borrow
+        # the intent tools and GetLiveContext. Its prompt is discarded: the
+        # whole point here is to replace the entity dump it carries.
+        stock = await async_get_tools(self.hass, llm_context, llm.LLM_API_ASSIST)
+        tools = async_wrap_tools(list(stock.tools), self._confirm_over)
+
+        exposed_entities: dict[str, dict[str, Any]] | None = None
         if llm_context.assistant:
-            exposed_entities = llm._get_exposed_entities(  # noqa: SLF001
+            exposed_entities = async_get_exposed_entities(
                 self.hass, llm_context.assistant, include_state=False
             )
 
-        # Nothing exposed at all: stock Assist already says so correctly, and
-        # there is no list to scope and nothing for the finder to find.
-        if not exposed_entities or not exposed_entities["entities"]:
-            return await super().async_get_api_instance(llm_context)
+        # Nothing exposed at all: there is no list to scope and nothing for the
+        # finder to find, so let the stock prompt say so in its own words.
+        if not exposed_entities:
+            return _LoggingAPIInstance(
+                api=self,
+                api_prompt=stock.prompt or "",
+                llm_context=llm_context,
+                tools=tools,
+                custom_serializer=llm.selector_serializer,
+            )
 
         scope = async_get_scope(self.hass, llm_context.device_id, self._earshot_prefix)
         if scope.area is None:
             self._log_roomless(llm_context)
 
-        tools = async_wrap_tools(
-            self._async_get_tools(llm_context, exposed_entities), self._confirm_over
-        )
-        tools.append(FindEntitiesTool(exposed_entities["entities"], self._max_matches))
+        tools.append(FindEntitiesTool(exposed_entities, self._max_matches))
 
         return _LoggingAPIInstance(
             api=self,
@@ -158,6 +173,18 @@ class ScopedAssistAPI(llm.AssistAPI):
             tools=tools,
             custom_serializer=llm.selector_serializer,
         )
+
+    @callback
+    def _async_get_timer_prompt(self, llm_context: llm.LLMContext) -> str | None:
+        """Warn when the caller cannot run timers.
+
+        Carried over from the built-in prompt, which this one replaces wholesale.
+        """
+        if llm_context.device_id and async_device_supports_timers(
+            self.hass, llm_context.device_id
+        ):
+            return None
+        return "This device is not able to start timers."
 
     @callback
     def _log_roomless(self, llm_context: llm.LLMContext) -> None:
@@ -187,12 +214,12 @@ class ScopedAssistAPI(llm.AssistAPI):
         self, llm_context: llm.LLMContext, exposed_entities: dict, scope: Scope
     ) -> str:
         """Assemble the prompt, with or without an originating room."""
-        entities: dict[str, dict[str, Any]] = exposed_entities["entities"]
+        entities = exposed_entities
         list_lines, listed = self._async_get_entity_list(entities, scope)
 
         parts = [
-            llm.DEVICE_CONTROL_TOOL_USAGE_PROMPT,
-            llm.DYNAMIC_CONTEXT_PROMPT
+            DEVICE_CONTROL_TOOL_USAGE_PROMPT,
+            DYNAMIC_CONTEXT_PROMPT
             if scope.area
             else _roomless_dynamic_context(),
             "",
@@ -206,7 +233,7 @@ class ScopedAssistAPI(llm.AssistAPI):
             self._async_get_floor_disambiguation(),
             "",
             *list_lines,
-            self._async_get_no_timer_prompt(llm_context),
+            self._async_get_timer_prompt(llm_context),
         ]
 
         prompt = "\n".join(part for part in parts if part is not None)
@@ -233,7 +260,7 @@ class ScopedAssistAPI(llm.AssistAPI):
             "The device list below covers ONLY those nearby areas. The home has "
             "many more devices elsewhere. Never answer that a device does not "
             "exist merely because it is absent from that list.",
-            "FindEntities locates devices that are not in the list below. It is "
+            f"{TOOL_NAME} locates devices that are not in the list below. It is "
             "read-only and cheap: if you are unsure whether a device is nearby, "
             "or where it is, just call it. It returns every match with its area; "
             "act on all of them. You may call it more than once in a turn.",
@@ -257,11 +284,11 @@ class ScopedAssistAPI(llm.AssistAPI):
             "only devices that belong to no single room. The home has many more "
             "devices. Never answer that a device does not exist merely because "
             "it is absent from that list.",
-            "FindEntities locates every other device in the home. It is "
+            f"{TOOL_NAME} locates every other device in the home. It is "
             "read-only and cheap: call it for anything the user names that is "
             "not in the list below. It returns every match with its area; act "
             "on all of them. You may call it more than once in a turn.",
-            "If the user names a device and FindEntities returns matches in "
+            f"If the user names a device and {TOOL_NAME} returns matches in "
             "several areas, ask which area they mean rather than guessing.",
             "To act on an area or a floor as a whole, pass that area or floor "
             "name to the intent tool.",
@@ -362,7 +389,7 @@ class ScopedAssistAPI(llm.AssistAPI):
             )
             return (
                 [
-                    f"No devices are listed for {where}. Use FindEntities for "
+                    f"No devices are listed for {where}. Use {TOOL_NAME} for "
                     "anything the user asks for."
                 ],
                 0,

@@ -1,10 +1,17 @@
 {
   "domain": "scoped_assist",
   "name": "Scoped Assist",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "documentation": "https://github.com/bytenik/ha-scoped-assist",
   "issue_tracker": "https://github.com/bytenik/ha-scoped-assist/issues",
-  "codeowners": ["@bytenik"],
-  "dependencies": ["conversation"],
+  "codeowners": [
+    "@bytenik"
+  ],
+  "dependencies": [
+    "conversation",
+    "homeassistant",
+    "intent",
+    "llm"
+  ],
   "iot_class": "calculated"
 }

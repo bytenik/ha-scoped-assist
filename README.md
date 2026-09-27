@@ -33,6 +33,10 @@ entities on `gpt-oss-20b` across nine command shapes: the flat prompt scored
 15/30, the scoped one 30/30. **Prompt shape, not model size, was the lever** —
 the same small model went from unusable to correct on the same hardware.
 
+Those figures, and the prompt sizes above, were measured on Home Assistant
+2026.7. The built-in prompt changed in 2026.9 and they have not been re-taken
+since.
+
 ## Installation
 
 ### HACS
@@ -122,7 +126,7 @@ With `actionable_only` (the default), sensors and other read-only entities are
 left out of the list; state questions are answered by `GetLiveContext`, which
 reads them on demand.
 
-## FindEntities
+## scoped_assist__FindEntities
 
 A read-only search tool for everything not in the prompt. It searches by name,
 widening only when the narrower attempt finds nothing:
@@ -190,19 +194,23 @@ model, or moving the count into replacement intent handlers.
 
 ## Compatibility
 
-Tested against **Home Assistant 2026.7.2**.
+Requires **Home Assistant 2026.9 or later**, and is tested against 2026.9.4.
 
-This integration calls `homeassistant.helpers.llm._get_exposed_entities`, a
-private API, to build the entity list exactly as the built-in Assist API does.
-Reimplementing it would mean duplicating around a hundred lines of upstream
-name, alias and area resolution and letting them drift. The trade is that a
-Home Assistant upgrade can break this integration with no deprecation warning.
+2026.9 restructured the Assist LLM machinery: `AssistAPI` moved out of
+`helpers/llm.py` and became a thin shell over a platform system, the entity
+list moved to the `homeassistant` component, and the device-control prompt to
+`intent`. Versions before 2026.9 will not work.
 
-It also subclasses `llm.AssistAPI` and reuses its tool assembly, and wraps
-`llm.APIInstance.async_call_tool`. These are public, but not contracts upstream
-has promised to hold.
+Every built-in LLM tools platform returns nothing unless the API id is the
+built-in one, so this integration asks for tools under that id to obtain the
+intent tools and `homeassistant__GetLiveContext`, then discards the prompt that
+accompanies them and supplies its own. It builds the entity list with
+`homeassistant.llm.async_get_exposed_entities`, which is public, and wraps
+`llm.APIInstance.async_call_tool` to log and to gate broad actions. None of
+these are contracts upstream has promised to hold: the 2026.7 to 2026.9 upgrade
+broke this integration outright, at import time, with no deprecation warning.
 
-Pin your Home Assistant version or read the release notes before upgrading.
+Read the release notes before upgrading.
 
 ## Logging
 
