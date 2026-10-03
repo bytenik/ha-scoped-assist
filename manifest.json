@@ -1,9 +1,6 @@
 {
   "domain": "scoped_assist",
   "name": "Scoped Assist",
-  "version": "0.2.0",
-  "documentation": "https://github.com/bytenik/ha-scoped-assist",
-  "issue_tracker": "https://github.com/bytenik/ha-scoped-assist/issues",
   "codeowners": [
     "@bytenik"
   ],
@@ -13,5 +10,9 @@
     "intent",
     "llm"
   ],
-  "iot_class": "calculated"
+  "documentation": "https://github.com/bytenik/ha-scoped-assist",
+  "integration_type": "service",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/bytenik/ha-scoped-assist/issues",
+  "version": "0.2.1"
 }

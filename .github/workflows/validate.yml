@@ -1,0 +1,51 @@
+name: Validate
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "23 4 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  hacs:
+    name: HACS
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate HACS repository
+        uses: hacs/action@main
+        with:
+          category: integration
+          comment: false
+
+  hassfest:
+    name: Hassfest
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      # Preserve the root layout used by HACS and Git submodule installs while
+      # validating under the integration's domain directory.
+      - uses: actions/checkout@v6
+        with:
+          path: custom_components/scoped_assist
+      - name: Validate Home Assistant integration
+        uses: home-assistant/actions/hassfest@master
+
+  smoke-test:
+    name: Home Assistant 2026.9 smoke test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - name: Import integration and validate configuration
+        run: |
+          docker run --rm \
+            --entrypoint python \
+            -v "$GITHUB_WORKSPACE:/workspace:ro" \
+            -w /workspace \
+            ghcr.io/home-assistant/home-assistant:2026.9.4 \
+            -m unittest discover -s tests -v

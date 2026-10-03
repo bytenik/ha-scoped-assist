@@ -1,6 +1,5 @@
 {
   "name": "Scoped Assist",
   "content_in_root": true,
-  "homeassistant": "2026.9.0",
-  "render_readme": true
+  "homeassistant": "2026.9.0"
 }
