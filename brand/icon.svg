@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <title>Scoped Assist: room-aware voice control</title>
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="#112D42"/>
+  <path d="M52 112 128 48l76 64v82a14 14 0 0 1-14 14H66a14 14 0 0 1-14-14Z" fill="none" stroke="#F4FAFF" stroke-width="12" stroke-linejoin="round"/>
+  <rect x="122" y="112" width="76" height="90" rx="12" fill="#35C9B8"/>
+  <path d="M140 157v-8m14 21v-34m14 43v-52m14 33v-14" fill="none" stroke="#112D42" stroke-width="8" stroke-linecap="round"/>
+</svg>

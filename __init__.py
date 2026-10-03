@@ -32,8 +32,7 @@ CONFIG_SCHEMA = vol.Schema(
                     CONF_EARSHOT_PREFIX, default=DEFAULT_EARSHOT_PREFIX
                 ): cv.string,
                 vol.Optional(
-                    CONF_AMBIENT_PREFIX,
-    CONF_CONFIRM_OVER, default=DEFAULT_AMBIENT_PREFIX
+                    CONF_AMBIENT_PREFIX, default=DEFAULT_AMBIENT_PREFIX
                 ): cv.string,
                 vol.Optional(
                     CONF_ACTIONABLE_ONLY, default=DEFAULT_ACTIONABLE_ONLY

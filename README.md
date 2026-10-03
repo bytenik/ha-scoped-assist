@@ -1,5 +1,8 @@
 # Scoped Assist
 
+[![Validate](https://github.com/bytenik/ha-scoped-assist/actions/workflows/validate.yml/badge.svg)](https://github.com/bytenik/ha-scoped-assist/actions/workflows/validate.yml)
+[![Release](https://img.shields.io/github/v/release/bytenik/ha-scoped-assist)](https://github.com/bytenik/ha-scoped-assist/releases/latest)
+
 A replacement Assist API for Home Assistant that tells the model **where the
 request came from**, and sends it the devices in that room instead of every
 device in the house.
@@ -41,13 +44,42 @@ since.
 
 ### HACS
 
-Add `https://github.com/bytenik/ha-scoped-assist` as a custom repository of
-type *Integration*, install, and restart Home Assistant.
+Requires **Home Assistant 2026.9 or later** and [HACS](https://www.hacs.xyz/).
+
+Until Scoped Assist is included in HACS's default catalog, add it as a custom
+repository:
+
+1. Open **HACS**, then its three-dot menu → **Custom repositories**.
+2. Add `https://github.com/bytenik/ha-scoped-assist` with type **Integration**.
+3. Find **Scoped Assist** in HACS and download it.
+4. Restart Home Assistant, then follow the configuration below.
+
+Once it is in the default catalog, search for **Scoped Assist** directly in
+HACS. Updates are available through HACS; restart Home Assistant after updating.
 
 ### Manual
 
-Copy this repository into `custom_components/scoped_assist/` in your Home
-Assistant configuration directory and restart.
+Download a [release](https://github.com/bytenik/ha-scoped-assist/releases/latest)
+and copy the root `*.py` files, `manifest.json`, and `brand/` directory into
+`custom_components/scoped_assist/` in your Home Assistant configuration directory.
+Restart Home Assistant, then follow the configuration below.
+
+### Git submodule
+
+The integration stays at the repository root, so existing submodule installs
+at `custom_components/scoped_assist/` continue to work. From your configuration
+repository, update only this submodule to a release:
+
+```sh
+git -C custom_components/scoped_assist fetch origin --tags
+git -C custom_components/scoped_assist checkout v0.2.1
+git add custom_components/scoped_assist
+git commit -m "Update Scoped Assist to v0.2.1"
+```
+
+Adjust the path if your configuration directory is nested in the parent
+repository, then restart Home Assistant. Keep each installation managed by
+either HACS or Git so an update does not overwrite a submodule checkout.
 
 ## Configuration
 
